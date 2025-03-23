@@ -5,12 +5,14 @@ import os
 import asyncio
 from huggingface_hub import login
 
-HF_TOKEN = st.secrets.get("HF_TOKEN") or os.getenv("HF_TOKEN")
+# HF_TOKEN = st.secrets.get("HF_TOKEN") or os.getenv("HF_TOKEN")
 
-if not HF_TOKEN:
-    st.error("Hugging Face token not found. Make sure it's set in Streamlit secrets.")
-else:
-    login(HF_TOKEN)
+# if not HF_TOKEN:
+#     st.error("Hugging Face token not found. Make sure it's set in Streamlit secrets.")
+# else:
+#     login(HF_TOKEN)
+HF_TOKEN = "your_actual_huggingface_token"
+login(HF_TOKEN)
 # Load BlenderBot model and tokenizer
 tokenizer = BlenderbotTokenizer.from_pretrained("facebook/blenderbot-400M-distill")
 model = BlenderbotForConditionalGeneration.from_pretrained("facebook/blenderbot-400M-distill").to("cpu")
