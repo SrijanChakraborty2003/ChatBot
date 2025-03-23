@@ -11,7 +11,7 @@ from huggingface_hub import login
 #     st.error("Hugging Face token not found. Make sure it's set in Streamlit secrets.")
 # else:
 #     login(HF_TOKEN)
-HF_TOKEN = "your_actual_huggingface_token"
+HF_TOKEN = "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"
 login(HF_TOKEN)
 # Load BlenderBot model and tokenizer
 tokenizer = BlenderbotTokenizer.from_pretrained("facebook/blenderbot-400M-distill")
