@@ -18,8 +18,12 @@ torch.classes.load_library = lambda _: None  # Disables unnecessary Torch class 
 HF_TOKEN = "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"
 login(HF_TOKEN)
 # Load Model and Tokenizer
+# Automatically select the available device
+device = "cuda" if torch.cuda.is_available() else "cpu"
+# Load model on the correct device
 tokenizer = BlenderbotTokenizer.from_pretrained("facebook/blenderbot-400M-distill")
-model = BlenderbotForConditionalGeneration.from_pretrained("facebook/blenderbot-400M-distill").to("cpu")
+model = BlenderbotForConditionalGeneration.from_pretrained("facebook/blenderbot-400M-distill").to(device)
+#model = BlenderbotForConditionalGeneration.from_pretrained("facebook/blenderbot-400M-distill").to("cpu")
 
 # Fix for Event Loop Issues
 def get_event_loop():
