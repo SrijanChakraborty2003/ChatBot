@@ -108,6 +108,6 @@ if user_input:
     st.session_state.chat_history.append(bot_response)
 
     # Refresh UI
-    st.experimental_rerun()
+    st.rerun()
 
 st.markdown("</div>", unsafe_allow_html=True)
