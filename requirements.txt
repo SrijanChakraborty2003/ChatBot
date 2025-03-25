@@ -1,7 +1,5 @@
-torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
-transformers==4.38.2
-huggingface_hub==0.20.3
-streamlit==1.30.0
-protobuf==5.29.4
-numpy==1.26.4
-pandas==2.2.3
+transformers
+accelerate
+sentencepiece
+streamlit
+torch
