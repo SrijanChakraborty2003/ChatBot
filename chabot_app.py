@@ -1,39 +1,41 @@
 import streamlit as st
-import torch
-import asyncio
 import psutil
-from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# Check available RAM
-ram_available = psutil.virtual_memory().available / (1024 * 1024)  # Convert to MB
-st.write(f"Available RAM: {ram_available:.2f} MB")
+# Lazy import transformers to avoid conflicts
+def load_transformers():
+    global AutoModelForCausalLM, AutoTokenizer, torch
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    return AutoModelForCausalLM, AutoTokenizer, torch
 
-# Load tokenizer
+# Load tokenizer function
 @st.cache_resource()
 def load_tokenizer():
+    _, AutoTokenizer, _ = load_transformers()
     return AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
 
-# Load model only once
+# Load model function
 @st.cache_resource()
 def load_model():
+    AutoModelForCausalLM, _, torch = load_transformers()
     return AutoModelForCausalLM.from_pretrained(
         "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-        torch_dtype=torch.float32,
-        device_map="cpu"
+        torch_dtype=torch.float32,  # Ensures compatibility with CPU
+        device_map="cpu"  # Forces CPU usage
     )
 
-# Ensure model is only loaded once
-if "model" not in st.session_state:
-    with st.spinner("Loading model... Please wait."):
-        st.session_state.model = load_model()
-
-model = st.session_state.model
+# Initialize components
 tokenizer = load_tokenizer()
+model = load_model()
 
+# Streamlit UI
 st.title("TinyLlama Chatbot")
 st.write("Chat with TinyLlama - A lightweight AI assistant!")
 
-# Store chat history
+# Display available RAM
+ram_available = psutil.virtual_memory().available / (1024 * 1024)  # Convert to MB
+st.write(f"Available RAM: {ram_available:.2f} MB")
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -41,21 +43,21 @@ if "messages" not in st.session_state:
 for role, text in st.session_state.messages:
     st.chat_message(role).write(text)
 
-# User input
+# Chat input
 user_input = st.chat_input("Type your message here...")
 
 if user_input:
     st.chat_message("user").write(user_input)
 
-    system_prompt = "You are a friendly AI assistant. Keep responses short and relevant."
+    # System prompt
+    system_prompt = "You are a friendly AI assistant. Keep responses short and relevant. Answer conversationally and avoid generating code unless explicitly asked."
     full_prompt = f"{system_prompt}\nUser: {user_input}\nAI:"
 
-    inputs = tokenizer(full_prompt, return_tensors="pt")  # Removed `.to("cpu")`
+    inputs = tokenizer(full_prompt, return_tensors="pt").to("cpu")
 
-    def generate_response():
+    # Generate response
+    with st.spinner("Generating response..."):
         with torch.no_grad():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)  # Fix async issue
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=30,
@@ -64,10 +66,8 @@ if user_input:
                 top_p=0.9,
                 pad_token_id=tokenizer.eos_token_id,
             )
-        return tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+        response = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
 
-    # Generate response
-    response = generate_response()
     st.chat_message("assistant").write(response)
 
     # Save chat history
