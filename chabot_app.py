@@ -20,15 +20,13 @@ def load_model():
     AutoModelForCausalLM, _, torch = load_transformers()
     return AutoModelForCausalLM.from_pretrained(
         "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-        torch_dtype=torch.float32,  # Ensures compatibility with CPU
-        device_map="cpu"  # Forces CPU usage
+        torch_dtype=torch.float32,
+        device_map="cpu"
     )
 
-# Initialize components
-tokenizer = load_tokenizer()
-model = load_model()
+# Streamlit UI Initialization
+st.set_page_config(page_title="TinyLlama Chatbot", layout="centered")
 
-# Streamlit UI
 st.title("TinyLlama Chatbot")
 st.write("Chat with TinyLlama - A lightweight AI assistant!")
 
@@ -36,8 +34,16 @@ st.write("Chat with TinyLlama - A lightweight AI assistant!")
 ram_available = psutil.virtual_memory().available / (1024 * 1024)  # Convert to MB
 st.write(f"Available RAM: {ram_available:.2f} MB")
 
+# Fix session state initialization
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+# Initialize model & tokenizer (inside Streamlit app)
+try:
+    tokenizer = load_tokenizer()
+    model = load_model()
+except Exception as e:
+    st.error(f"Error loading model: {e}")
 
 # Display chat history
 for role, text in st.session_state.messages:
@@ -57,16 +63,20 @@ if user_input:
 
     # Generate response
     with st.spinner("Generating response..."):
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=30,
-                do_sample=True,
-                temperature=0.7,
-                top_p=0.9,
-                pad_token_id=tokenizer.eos_token_id,
-            )
-        response = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+        try:
+            with torch.no_grad():
+                outputs = model.generate(
+                    **inputs,
+                    max_new_tokens=30,
+                    do_sample=True,
+                    temperature=0.7,
+                    top_p=0.9,
+                    pad_token_id=tokenizer.eos_token_id,
+                )
+            response = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+        except Exception as e:
+            st.error(f"Error generating response: {e}")
+            response = "Sorry, I encountered an issue."
 
     st.chat_message("assistant").write(response)
 
