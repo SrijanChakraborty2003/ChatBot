@@ -1,7 +1,19 @@
 import streamlit as st
 import torch
 import psutil
+import asyncio
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# Fix async loop issue
+def get_or_create_event_loop():
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop
+
+get_or_create_event_loop()  # Ensure asyncio loop exists
 
 # Check available RAM before loading
 ram_available = psutil.virtual_memory().available / (1024 * 1024)  # Convert to MB
@@ -12,13 +24,19 @@ st.write(f"Available RAM: {ram_available:.2f} MB")
 def load_tokenizer():
     return AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
 
-# Lazy model loading (avoids RAM overload)
+# Load model safely (only once)
 def load_model():
     return AutoModelForCausalLM.from_pretrained(
         "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-        torch_dtype=torch.float32,  # Ensures compatibility with CPU
-        device_map="cpu"  # Forces CPU usage
-    )
+        torch_dtype=torch.float32,  # Ensures CPU compatibility
+        device_map=None,  # Prevent GPU issues
+    ).to("cpu")  # Explicitly use CPU
+
+# Ensure model is loaded only once
+if "model" not in st.session_state:
+    with st.spinner("Loading model... This may take a while."):
+        st.session_state.model = load_model()
+model = st.session_state.model
 
 tokenizer = load_tokenizer()
 
@@ -43,9 +61,7 @@ if user_input:
 
     inputs = tokenizer(full_prompt, return_tensors="pt").to("cpu")
 
-    # Load model only when needed
     with st.spinner("Generating response..."):
-        model = load_model()  # Load model only here (prevents Streamlit crashes)
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
