@@ -1,20 +1,23 @@
 import streamlit as st
 import torch
-import asyncio
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# Force CPU usage
+device = torch.device("cpu")
 
 # Load tokenizer separately with caching
 @st.cache_resource()
 def load_tokenizer():
     return AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
 
+# Load model with low CPU memory usage
 @st.cache_resource()
 def load_model():
     return AutoModelForCausalLM.from_pretrained(
         "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
         torch_dtype=torch.float32,
-        device_map="cpu",
-    )
+        low_cpu_mem_usage=True
+    ).to(device)
 
 # Load tokenizer and model
 tokenizer = load_tokenizer()
@@ -42,13 +45,13 @@ if user_input:
     system_prompt = "You are a friendly AI assistant. Keep responses short and relevant. Answer conversationally and avoid generating code unless explicitly asked."
     full_prompt = f"{system_prompt}\nUser: {user_input}\nAI:"
 
-    inputs = tokenizer(full_prompt, return_tensors="pt").to("cpu")
+    inputs = tokenizer(full_prompt, return_tensors="pt").to(device)
 
-    async def generate_response():
+    def generate_response():
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=50,
+                max_new_tokens=30,  # Reduce output length for faster response
                 do_sample=True,
                 temperature=0.7,
                 top_p=0.9,
@@ -56,12 +59,10 @@ if user_input:
             )
         return tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
 
-    # Corrected async handling for Streamlit
-    async def process_chat():
-        response = await generate_response()
-        st.chat_message("assistant").write(response)
-        st.session_state.messages.append(("user", user_input))
-        st.session_state.messages.append(("assistant", response))
+    # Generate and display response
+    response = generate_response()
+    st.chat_message("assistant").write(response)
 
-    # Ensure async execution in Streamlit
-    asyncio.create_task(process_chat())
+    # Save conversation in session state
+    st.session_state.messages.append(("user", user_input))
+    st.session_state.messages.append(("assistant", response))
