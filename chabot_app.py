@@ -1,7 +1,7 @@
 import streamlit as st
 import torch
 import psutil
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Check available RAM before loading
 ram_available = psutil.virtual_memory().available / (1024 * 1024)  # Convert to MB
@@ -12,14 +12,14 @@ st.write(f"Available RAM: {ram_available:.2f} MB")
 def load_tokenizer():
     return AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
 
-# Load model with quantization
+# Load model without 8-bit quantization (CPU-friendly)
 @st.cache_resource()
 def load_model():
-    quant_config = BitsAndBytesConfig(load_in_8bit=True)  # Use 8-bit for lower RAM usage
     return AutoModelForCausalLM.from_pretrained(
         "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-        quantization_config=quant_config
-    ).to("cpu")
+        torch_dtype=torch.float32,  # Ensures compatibility with CPU
+        device_map="cpu"  # Forces CPU usage
+    )
 
 # Lazy loading to prevent Streamlit timeout
 if "model" not in st.session_state:
