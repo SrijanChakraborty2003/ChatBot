@@ -8,6 +8,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 def load_tokenizer():
     return AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
 
+@st.cache_resource()
 def load_model():
     return AutoModelForCausalLM.from_pretrained(
         "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
@@ -56,12 +57,11 @@ if user_input:
         return tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
 
     # Corrected async handling for Streamlit
-    if asyncio.get_event_loop().is_running():
-        response = asyncio.run(generate_response())  # Safe async execution
-    else:
-        response = generate_response()
+    async def process_chat():
+        response = await generate_response()
+        st.chat_message("assistant").write(response)
+        st.session_state.messages.append(("user", user_input))
+        st.session_state.messages.append(("assistant", response))
 
-    st.chat_message("assistant").write(response)
-
-    st.session_state.messages.append(("user", user_input))
-    st.session_state.messages.append(("assistant", response))
+    # Ensure async execution in Streamlit
+    asyncio.create_task(process_chat())
