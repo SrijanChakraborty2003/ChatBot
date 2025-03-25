@@ -3,23 +3,21 @@ import torch
 import asyncio
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# Load the model and tokenizer with caching
+# Load tokenizer separately with caching
 @st.cache_resource()
+def load_tokenizer():
+    return AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
+
 def load_model():
-    model_name = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-    # Ensure compatibility with CPU and avoid float16 issues
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name, 
-        torch_dtype=torch.float32,  # Changed from float16 to avoid CPU errors
-        device_map="cpu"
+    return AutoModelForCausalLM.from_pretrained(
+        "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+        torch_dtype=torch.float32,
+        device_map="cpu",
     )
-    
-    return tokenizer, model
 
-# Load model
-tokenizer, model = load_model()
+# Load tokenizer and model
+tokenizer = load_tokenizer()
+model = load_model()
 
 # Streamlit UI
 st.title("TinyLlama Chatbot")
@@ -31,25 +29,22 @@ if "messages" not in st.session_state:
 
 # Display chat history
 for role, text in st.session_state.messages:
-    st.chat_message(role).write(text)
+    if role in ["user", "assistant"]:
+        st.chat_message(role).write(text)
 
 # Chat input
 user_input = st.chat_input("Type your message here...")
 
 if user_input:
-    # Display user message
     st.chat_message("user").write(user_input)
 
-    # System prompt remains unchanged
     system_prompt = "You are a friendly AI assistant. Keep responses short and relevant. Answer conversationally and avoid generating code unless explicitly asked."
     full_prompt = f"{system_prompt}\nUser: {user_input}\nAI:"
 
-    # Tokenize input
     inputs = tokenizer(full_prompt, return_tensors="pt").to("cpu")
 
-    # Ensure compatibility with Streamlit's async event loop
     async def generate_response():
-        with torch.no_grad():  # Disable gradient calculation for efficiency
+        with torch.no_grad():
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=50,
@@ -60,15 +55,13 @@ if user_input:
             )
         return tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
 
-    # Check if we're in an async environment (to avoid Streamlit errors)
-    if hasattr(asyncio, "run"):
-        response = asyncio.run(generate_response())  # Run safely in Streamlit
+    # Corrected async handling for Streamlit
+    if asyncio.get_event_loop().is_running():
+        response = asyncio.run(generate_response())  # Safe async execution
     else:
-        response = generate_response()  # Fallback for non-async environments
+        response = generate_response()
 
-    # Display assistant response
     st.chat_message("assistant").write(response)
 
-    # Update session state
     st.session_state.messages.append(("user", user_input))
     st.session_state.messages.append(("assistant", response))
