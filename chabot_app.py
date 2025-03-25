@@ -12,8 +12,7 @@ st.write(f"Available RAM: {ram_available:.2f} MB")
 def load_tokenizer():
     return AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
 
-# Load model without 8-bit quantization (CPU-friendly)
-@st.cache_resource()
+# Lazy model loading (avoids RAM overload)
 def load_model():
     return AutoModelForCausalLM.from_pretrained(
         "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
@@ -21,19 +20,11 @@ def load_model():
         device_map="cpu"  # Forces CPU usage
     )
 
-# Lazy loading to prevent Streamlit timeout
-if "model" not in st.session_state:
-    with st.spinner("Loading model... This may take a while."):
-        st.session_state.model = load_model()
-
 tokenizer = load_tokenizer()
-model = st.session_state.model
 
-# Streamlit UI
 st.title("TinyLlama Chatbot")
 st.write("Chat with TinyLlama - A lightweight AI assistant!")
 
-# Initialize session state for chat messages
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -52,7 +43,9 @@ if user_input:
 
     inputs = tokenizer(full_prompt, return_tensors="pt").to("cpu")
 
-    def generate_response():
+    # Load model only when needed
+    with st.spinner("Generating response..."):
+        model = load_model()  # Load model only here (prevents Streamlit crashes)
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
@@ -62,12 +55,10 @@ if user_input:
                 top_p=0.9,
                 pad_token_id=tokenizer.eos_token_id,
             )
-        return tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+        response = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
 
-    # Generate and display response
-    response = generate_response()
     st.chat_message("assistant").write(response)
 
-    # Save conversation in session state
+    # Save chat history
     st.session_state.messages.append(("user", user_input))
     st.session_state.messages.append(("assistant", response))
